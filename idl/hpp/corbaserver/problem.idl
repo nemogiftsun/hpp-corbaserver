@@ -38,6 +38,9 @@ module hpp
     /// Get goal configurations of specified problem.
     ///	\return Array of degrees of freedom
     floatSeqSeq getGoalConfigs () raises (Error);
+     
+    floatSeqSeq getWaypoints (in unsigned short inPathId) raises (Error);
+
 
     /// Reset goal configurations
     void resetGoalConfigs () raises (Error);

@@ -21,6 +21,7 @@
 #include <hpp/core/path-planner.hh>
 #include <hpp/core/path-optimizer.hh>
 #include <hpp/core/path-vector.hh>
+#include <hpp/core/straight-path.hh>
 #include <hpp/core/path.hh>
 #include <hpp/core/roadmap.hh>
 #include <hpp/core/steering-method.hh>
@@ -61,7 +62,7 @@ namespace hpp
 	// Get robot in hppPlanner object.
 	DevicePtr_t robot = problemSolver->robot ();
 
-	// Compare size of input array with number of degrees of freedom of
+	// Compare size of input array with number of degogrees of freedom of
 	// robot.
 	if (configDim != robot->configSize ()) {
 	  hppDout (error, "robot nb dof=" << configDim <<
@@ -532,6 +533,77 @@ namespace hpp
 	  throw hpp::Error (exc.what ());
 	}
       }
+//---------------------------------
+void findExtremes(PathPtr_t path, hpp::floatSeqSeq& configSequence,const std::size_t points)
+{
+      std::size_t size_increment;
+      Configuration_t config,config_1;
+      std::vector<Configuration_t> configs;
+      hpp::floatSeq dofArray;
+      size_increment = ((points==0)||(points==1))?1:2;
+      config = (*path) (0);
+      configs.push_back(config);
+      config_1 = (*path) (path->length());
+      configs.push_back(config_1);
+      dofArray.length (config.size());
+      // modify configsequence
+      configSequence.length (configSequence.length() + size_increment);
+      std::size_t ptr = configSequence.length() - size_increment;
+      for (std::size_t i=0; i<size_increment; ++i)
+      {
+          std::size_t loc = (size_increment == 1)?points:i;
+          for (std::size_t j=0; j<(config.size()); ++j)
+          {
+            dofArray[j] = configs[loc][j];
+          }
+          (configSequence)[ptr+i] = dofArray;
+      }
+}
+//---------------------------------
+
+void findExtremities(PathVectorPtr_t path, hpp::floatSeqSeq&  configSequence)
+{
+        std::size_t num_subpaths  = (*path).numberPaths ();
+        if (num_subpaths == 1) 
+        {
+           findExtremes(path,configSequence,1);
+        }
+        else 
+        {
+             for (std::size_t i = 0; i < num_subpaths; ++i)
+             {        
+                 PathPtr_t subpath = (*path).pathAtRank(i); 
+                 if (typeid(*subpath) == typeid(hpp::core::PathVectorPtr_t))
+                 {
+                     PathVectorPtr_t sp= HPP_DYNAMIC_PTR_CAST (hpp::core::PathVector,subpath);
+                     findExtremities(sp,configSequence);
+                 }
+                 else
+                 {
+                     findExtremes(subpath,configSequence,1);
+                 }             
+            }
+            //hpp::core::StraightPathPtr_t subpath= HPP_DYNAMIC_PTR_CAST                          (hpp::core::StraightPath,path);
+        }
+}
+     // --------------------------------------------------------------
+hpp::floatSeqSeq* Problem::getWaypoints (UShort inPathId) throw (hpp::Error)
+{   
+	try {
+        hpp::floatSeqSeq *configSequence;
+        configSequence = new hpp::floatSeqSeq ();
+	      PathPtr_t path = problemSolver_->paths () [inPathId];
+        //init path
+        findExtremes(path,*configSequence,0);
+        PathVectorPtr_t sp= HPP_DYNAMIC_PTR_CAST (hpp::core::PathVector,path);
+        findExtremities(sp,*configSequence);
+        return configSequence;
+	    } 
+  catch (const std::exception& exc) {
+	        throw hpp::Error (exc.what ());
+	    }
+
+ }
 
       // ---------------------------------------------------------------
 
